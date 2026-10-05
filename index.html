@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diario del Nido</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FF8C00">
+  <style>
+    :root {
+      --primary: #FF8C00;
+      --primary-hover: #E07B00;
+      --bg: #FFF8F0;
+      --card-bg: #FFFFFF;
+      --text: #2C3E50;
+      --accent: #FFE2D1;
+      --border: #FFE0C2;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: linear-gradient(135deg, #FF8C00, #FF6F00);
+      color: white;
+      padding: 1.2rem;
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: bold;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+      letter-spacing: 0.5px;
+    }
+    .container {
+      max-width: 650px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: 18px;
+      padding: 1.5rem;
+      margin-bottom: 1.2rem;
+      box-shadow: 0 4px 15px rgba(255, 140, 0, 0.08);
+      border: 1px solid var(--border);
+    }
+    h2, h3 {
+      margin-top: 0;
+      color: #D96B00;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    label {
+      display: block;
+      margin-top: 1.2rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #4A321A;
+    }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 0.8rem;
+      margin-top: 0.4rem;
+      border: 1px solid #FFC499;
+      border-radius: 12px;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.2);
+    }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 1.2rem;
+      border-radius: 12px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 6px rgba(255, 140, 0, 0.3);
+    }
+    button:hover {
+      background: var(--primary-hover);
+    }
+    .btn-secondary {
+      background: #FFF3EB;
+      color: #D96B00;
+      border: 1px dashed #FF8C00;
+      box-shadow: none;
+      margin-top: 0.6rem;
+    }
+    .btn-secondary:hover {
+      background: #FFE2D1;
+    }
+    .btn-remove {
+      background: #FF5252;
+      color: white;
+      padding: 0.4rem 0.8rem;
+      width: auto;
+      font-size: 0.85rem;
+      margin-top: 0;
+      box-shadow: none;
+    }
+    .hidden {
+      display: none;
+    }
+    .mood-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+    }
+    .btn-option {
+      padding: 0.61rem 0.4rem;
+      background: #FFF3EB;
+      color: #333;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .btn-option.selected {
+      border-color: var(--primary);
+      background: var(--accent);
+      font-weight: bold;
+      color: #D96B00;
+    }
+    .dynamic-item {
+      background: #FFFBF8;
+      border: 1px dashed #FFC499;
+      padding: 0.8rem;
+      border-radius: 12px;
+      margin-top: 0.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .dynamic-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .entry-item {
+      border-left: 5px solid var(--primary);
+      background: #FFFBF8;
+      padding: 1.2rem;
+      border-radius: 12px;
+      margin-bottom: 1.2rem;
+      border: 1px solid #FFE8D6;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .entry-section {
+      margin-bottom: 0.6rem;
+      line-height: 1.4;
+    }
+    .timestamp {
+      font-size: 0.8rem;
+      color: #888888;
+      margin-top: 0.8rem;
+      border-top: 1px solid #FFE0C2;
+      padding-top: 0.4rem;
+    }
+    .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: var(--primary);
+      padding: 0.25rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+  </style>
+
+  <!-- Firebase Web SDK v9 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    // PIN Educatrici / Educatori
+    const SECRET_EDUCATOR_PIN = "MGGCUORE2026"; 
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCgLnGdp01YY12hJPwAK3mxBi_uEPfZVgc",
+      authDomain: "nido-app-23cb1.firebaseapp.com",
+      projectId: "nido-app-23cb1",
+      storageBucket: "nido-app-23cb1.firebasestorage.app",
+      messagingSenderId: "205637871971",
+      appId: "1:205637871971:web:876a99717f8b1518378b56"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Stato form
+    let selectedMoods = [];
+    let selectedSnackQty = 'Mangiata tutta';
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Gestione Selezione Multipla Umore
+      document.querySelectorAll('.mood-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const val = e.target.dataset.val;
+          if (selectedMoods.includes(val)) {
+            selectedMoods = selectedMoods.filter(m => m !== val);
+            e.target.classList.remove('selected');
+          } else {
+            selectedMoods.push(val);
+            e.target.classList.add('selected');
+          }
+        });
+      });
+
+      // Selettore Quantità Merenda
+      document.querySelectorAll('.snack-qty-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.snack-qty-btn').forEach(b => b.classList.remove('selected'));
+          e.target.classList.add('selected');
+          selectedSnackQty = e.target.dataset.val;
+        });
+      });
+
+      // Aggiungi primo cambio pannolino di default
+      addDiaperRow();
+    });
+
+    // Gestione Dinamica Cambi Pannolino
+    window.addDiaperRow = function() {
+      const container = document.getElementById('diaperContainer');
+      const now = new Date();
+      const timeStr = now.toTimeString().substring(0, 5);
+
+      const div = document.createElement('div');
+      div.className = 'dynamic-item diaper-item';
+      div.innerHTML = `
+        <div class="dynamic-row">
+          <input type="time" class="diaper-time" value="${timeStr}" style="width: 110px; margin-top:0;">
+          <select class="diaper-status" style="margin-top:0;">
+            <option value="Bagnato">💦 Bagnato</option>
+            <option value="Sporco">💩 Sporco</option>
+            <option value="Pulito / Controllato">✨ Pulito / Controllato</option>
+          </select>
+          <button type="button" class="btn-remove" onclick="this.closest('.dynamic-item').remove()">✕</button>
+        </div>
+      `;
+      container.appendChild(div);
+    };
+
+    // Gestione Dinamica Attività del Mattino
+    window.addActivityRow = function() {
+      const container = document.getElementById('activityContainer');
+      const div = document.createElement('div');
+      div.className = 'dynamic-item activity-item';
+      div.innerHTML = `
+        <div class="dynamic-row">
+          <input type="text" class="activity-text" placeholder="Es. Pittura a dita, Travasi, Canzoncine..." style="margin-top:0;">
+          <button type="button" class="btn-remove" onclick="this.closest('.dynamic-item').remove()">✕</button>
+        </div>
+      `;
+      container.appendChild(div);
+    };
+
+    // Login Educatrici / Educatori
+    window.loginEducator = function() {
+      const pin = document.getElementById('educatorPin').value;
+      if (pin === SECRET_EDUCATOR_PIN) {
+        document.getElementById('auth-card').classList.add('hidden');
+        document.getElementById('educator-view').classList.remove('hidden');
+      } else {
+        alert('PIN errato. Riprova.');
+      }
+    };
+
+    // Login Famiglie
+    window.loginParent = function() {
+      const code = document.getElementById('childCodeInput').value.trim().toUpperCase();
+      if (code.length >= 3) {
+        document.getElementById('auth-card').classList.add('hidden');
+        document.getElementById('parent-view').classList.remove('hidden');
+        document.getElementById('displayChildCode').innerText = code;
+        listenForEntries(code);
+      } else {
+        alert('Inserisci un codice valido per la bambina o il bambino.');
+      }
+    };
+
+    // Salvataggio Scheda
+    window.saveEntry = async function() {
+      const childCode = document.getElementById('targetChildCode').value.trim().toUpperCase();
+      const snackWhat = document.getElementById('snackWhat').value.trim();
+      const note = document.getElementById('entryNote').value.trim();
+
+      if (!childCode) {
+        alert('Inserisci il codice identificativo della bambina o del bambino.');
+        return;
+      }
+
+      // Raccolta cambi pannolino
+      const diaperElements = document.querySelectorAll('.diaper-item');
+      let diapersList = [];
+      diaperElements.forEach(el => {
+        const time = el.querySelector('.diaper-time').value;
+        const status = el.querySelector('.diaper-status').value;
+        if (time && status) {
+          diapersList.push({ time, status });
+        }
+      });
+
+      // Raccolta attività
+      const activityElements = document.querySelectorAll('.activity-text');
+      let activitiesList = [];
+      activityElements.forEach(el => {
+        const val = el.value.trim();
+        if (val) activitiesList.push(val);
+      });
+
+      try {
+        await addDoc(collection(db, "diario_entries"), {
+          childCode: childCode,
+          moods: selectedMoods.length > 0 ? selectedMoods : ['😊 Sereno / Felice'],
+          diapers: diapersList,
+          snack: {
+            qty: selectedSnackQty,
+            what: snackWhat || 'Merenda del mattino'
+          },
+          activities: activitiesList,
+          note: note,
+          createdAt: new Date().toISOString()
+        });
+
+        alert('Scheda giornaliera inviata con successo!');
+        
+        // Reset campi
+        document.getElementById('snackWhat').value = '';
+        document.getElementById('entryNote').value = '';
+        document.getElementById('activityContainer').innerHTML = '';
+        document.getElementById('diaperContainer').innerHTML = '';
+        addDiaperRow();
+
+      } catch (e) {
+        console.error("Errore di salvataggio: ", e);
+        alert("Errore durante l'invio della scheda.");
+      }
+    };
+
+    // Lettura in tempo reale lato Famiglie
+    function listenForEntries(childCode) {
+      const q = query(
+        collection(db, "diario_entries"),
+        where("childCode", "==", childCode)
+      );
+
+      onSnapshot(q, (snapshot) => {
+        const listEl = document.getElementById('entriesList');
+        listEl.innerHTML = '';
+
+        if (snapshot.empty) {
+          listEl.innerHTML = '<p style="text-align:center; color:#888;">Nessun aggiornamento presente per la giornata odierna.</p>';
+          return;
+        }
+
+        let entries = [];
+        snapshot.forEach((doc) => entries.push(doc.data()));
+        entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        entries.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'entry-item';
+
+          // Formattazione Umori
+          const moodsText = item.moods ? item.moods.join(' • ') : (item.mood || 'Nessuna indicazione');
+
+          // Formattazione Cambi Pannolino
+          let diapersHtml = '';
+          if (item.diapers && item.diapers.length > 0) {
+            diapersHtml = item.diapers.map(d => `<span class="badge" style="margin-right:0.3rem; margin-bottom:0.3rem;">🕒 ${d.time} - ${d.status}</span>`).join(' ');
+          } else if (item.diaper) {
+            diapersHtml = `<span class="badge">${item.diaper}</span>`;
+          } else {
+            diapersHtml = 'Nessun cambio registrato';
+          }
+
+          // Formattazione Attività
+          let activitiesHtml = '';
+          if (item.activities && item.activities.length > 0) {
+            activitiesHtml = item.activities.map(act => `<li>${act}</li>`).join('');
+          } else if (item.activity) {
+            activitiesHtml = `<li>${item.activity}</li>`;
+          }
+
+          div.innerHTML = `
+            <div class="entry-section">
+              <strong>😊 Umore al mattino:</strong><br>
+              <div style="margin-top:0.3rem; font-size:1.05rem; color:#D96B00;">${moodsText}</div>
+            </div>
+
+            <div class="entry-section" style="margin-top:0.8rem;">
+              <strong>🧷 Cambio Pannolino / Bagno (${item.diapers ? item.diapers.length : 1}):</strong><br>
+              <div style="margin-top:0.4rem;">${diapersHtml}</div>
+            </div>
+
+            <div class="entry-section" style="margin-top:0.8rem;">
+              <strong>🍎 Merenda del Mattino:</strong><br>
+              <div style="margin-top:0.2rem;">
+                ${item.snack ? `<strong>${item.snack.qty}</strong>${item.snack.what ? ` (${item.snack.what})` : ''}` : 'Regolare'}
+              </div>
+            </div>
+
+            ${activitiesHtml ? `
+              <div class="entry-section" style="margin-top:0.8rem;">
+                <strong>🎨 Attività Svolte:</strong>
+                <ul style="margin:0.3rem 0 0 1.2rem; padding:0;">${activitiesHtml}</ul>
+              </div>
+            ` : ''}
+
+            ${item.note ? `
+              <div class="entry-section" style="margin-top:0.8rem;">
+                <strong>💌 Note per la Famiglia:</strong>
+                <div style="background:#FFF3EB; padding:0.6rem; border-radius:8px; margin-top:0.3rem;">${item.note}</div>
+              </div>
+            ` : ''}
+
+            <div class="timestamp">Aggiornato alle ${new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+          `;
+          listEl.appendChild(div);
+        });
+      });
+    }
+
+    window.logout = function() {
+      location.reload();
+    };
+  </script>
+</head>
+<body>
+
+  <header>
+    Diario del Nido
+  </header>
+
+  <div class="container">
+    <!-- Scheda Accesso -->
+    <div id="auth-card" class="card">
+      <h2>Benvenuti*</h2>
+      
+      <div style="margin-bottom: 1.8rem;">
+        <h3>Sei un'Educatrice o un Educatore?</h3>
+        <label for="educatorPin">Inserisci il PIN di accesso:</label>
+        <input type="password" id="educatorPin" placeholder="PIN di sicurezza">
+        <button onclick="loginEducator()">Accedi come Educatrice / Educatore</button>
+      </div>
+
+      <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid #FFE0C2;">
+
+      <div>
+        <h3>Sei una Famiglia?</h3>
+        <label for="childCodeInput">Codice Personale Bambina / Bambino:</label>
+        <input type="text" id="childCodeInput" placeholder="Es. MARCO123">
+        <button onclick="loginParent()">Accedi come Famiglia</button>
+      </div>
+    </div>
+
+    <!-- Sezione Compilazione Educatrici / Educatori -->
+    <div id="educator-view" class="card hidden">
+      <h2>Scheda Giornaliera</h2>
+      
+      <label for="targetChildCode">Codice Bambina / Bambino:</label>
+      <input type="text" id="targetChildCode" placeholder="Es. MARCO123">
+
+      <label>😊 Umore al mattino / accoglienza (scelta multipla):</label>
+      <div class="mood-grid">
+        <button type="button" class="btn-option mood-btn" data-val="😊 Sereno">😊 Sereno</button>
+        <button type="button" class="btn-option mood-btn" data-val="😐 Tranquillo">😐 Tranquillo</button>
+        <button type="button" class="btn-option mood-btn" data-val="😢 Agitato">😢 Agitato</button>
+        <button type="button" class="btn-option mood-btn" data-val="😴 Coccole">😴 Coccole</button>
+        <button type="button" class="btn-option mood-btn" data-val="😠 Stizzito">😠 Stizzito</button>
+      </div>
+
+      <label>🧷 Cambio Pannolino / Bagno:</label>
+      <div id="diaperContainer"></div>
+      <button type="button" class="btn-secondary" onclick="addDiaperRow()">+ Aggiungi un altro cambio</button>
+
+      <label>🍎 Merenda del mattino:</label>
+      <div class="mood-grid" style="margin-bottom: 0.5rem;">
+        <button type="button" class="btn-option snack-qty-btn selected" data-val="Mangiata tutta">Tutta</button>
+        <button type="button" class="btn-option snack-qty-btn" data-val="Mangiata a metà">A metà</button>
+        <button type="button" class="btn-option snack-qty-btn" data-val="Mangiata poca">Poca</button>
+        <button type="button" class="btn-option snack-qty-btn" data-val="Non mangiata">No</button>
+      </div>
+      <input type="text" id="snackWhat" placeholder="Cosa ha mangiato? (Es. Mela e biscotti)">
+
+      <label>🎨 Attività del mattino svolte:</label>
+      <div id="activityContainer"></div>
+      <button type="button" class="btn-secondary" onclick="addActivityRow()">+ Aggiungi un'altra attività</button>
+
+      <label for="entryNote">💌 Note per la Famiglia:</label>
+      <textarea id="entryNote" rows="3" placeholder="Aggiungi eventuali comunicazioni o dettagli della giornata..."></textarea>
+
+      <button onclick="saveEntry()">Invia Scheda alla Famiglia</button>
+      <button onclick="logout()" style="background: #A0A0A0; margin-top: 0.6rem;">Esci</button>
+    </div>
+
+    <!-- Sezione Visualizzazione Famiglie -->
+    <div id="parent-view" class="card hidden">
+      <h2>Diario di <span id="displayChildCode"></span></h2>
+      <div id="entriesList">
+        <p style="text-align:center; color:#888;">Caricamento aggiornamenti in corso...</p>
+      </div>
+      <button onclick="logout()" style="background: #A0A0A0; margin-top: 1.2rem;">Esci</button>
+    </div>
+  </div>
+
+</body>
+</html>
