@@ -220,7 +220,7 @@
     let deferredPrompt;
 
     window.addEventListener('DOMContentLoaded', () => {
-      // Imposta data odierna di default nel campo data dell'educatrice
+      // Imposta data odierna
       const today = new Date().toISOString().split('T')[0];
       const entryDateInput = document.getElementById('entryDate');
       if (entryDateInput) entryDateInput.value = today;
@@ -248,8 +248,9 @@
         });
       });
 
-      // Primo cambio pannolino di default
+      // Elementi iniziali di default
       addDiaperRow();
+      addSleepRow();
 
       // Installazione PWA
       window.addEventListener('beforeinstallprompt', (e) => {
@@ -270,6 +271,30 @@
           deferredPrompt = null;
         });
       }
+    };
+
+    // Gestione Dinamica Sonno
+    window.addSleepRow = function() {
+      const container = document.getElementById('sleepContainer');
+      const div = document.createElement('div');
+      div.className = 'dynamic-item sleep-item';
+      div.innerHTML = `
+        <div class="dynamic-row">
+          <select class="sleep-status" style="margin-top:0;">
+            <option value="Ha dormito">😴 Ha dormito</option>
+            <option value="Non ha dormito">😳 Non ha dormito</option>
+            <option value="Poco / A tratti">🥱 Poco / A tratti</option>
+          </select>
+          <button type="button" class="btn-remove" onclick="this.closest('.dynamic-item').remove()">✕</button>
+        </div>
+        <div class="dynamic-row" style="margin-top:0.3rem;">
+          <span style="font-size:0.85rem; color:#666;">Dalle:</span>
+          <input type="time" class="sleep-from" value="13:00" style="margin-top:0;">
+          <span style="font-size:0.85rem; color:#666;">Alle:</span>
+          <input type="time" class="sleep-to" value="15:00" style="margin-top:0;">
+        </div>
+      `;
+      container.appendChild(div);
     };
 
     // Gestione Dinamica Cambi Pannolino
@@ -349,6 +374,17 @@
         return;
       }
 
+      // Estrazione Dati Sonno
+      const sleepElements = document.querySelectorAll('.sleep-item');
+      let sleepsList = [];
+      sleepElements.forEach(el => {
+        const status = el.querySelector('.sleep-status').value;
+        const from = el.querySelector('.sleep-from').value;
+        const to = el.querySelector('.sleep-to').value;
+        sleepsList.push({ status, from, to });
+      });
+
+      // Estrazione Dati Pannolini
       const diaperElements = document.querySelectorAll('.diaper-item');
       let diapersList = [];
       diaperElements.forEach(el => {
@@ -357,6 +393,7 @@
         if (time && status) diapersList.push({ time, status });
       });
 
+      // Estrazione Dati Attività
       const activityElements = document.querySelectorAll('.activity-text');
       let activitiesList = [];
       activityElements.forEach(el => {
@@ -369,7 +406,8 @@
           childCode: childCode,
           educatorName: educatorName,
           date: entryDate,
-          moods: selectedMoods.length > 0 ? selectedMoods : ['😊 Sereno'],
+          moods: selectedMoods.length > 0 ? selectedMoods : ['😊 Sereno/a'],
+          sleeps: sleepsList,
           diapers: diapersList,
           snack: {
             qty: selectedSnackQty,
@@ -385,7 +423,9 @@
         document.getElementById('entryNote').value = '';
         document.getElementById('activityContainer').innerHTML = '';
         document.getElementById('diaperContainer').innerHTML = '';
+        document.getElementById('sleepContainer').innerHTML = '';
         addDiaperRow();
+        addSleepRow();
 
       } catch (e) {
         console.error("Errore di salvataggio: ", e);
@@ -419,6 +459,21 @@
 
           const moodsText = item.moods ? item.moods.join(' • ') : (item.mood || 'Nessuna indicazione');
 
+          // HTML Sonno
+          let sleepHtml = '';
+          if (item.sleeps && item.sleeps.length > 0) {
+            sleepHtml = item.sleeps.map(s => {
+              if (s.status === 'Non ha dormito') {
+                return `<span class="badge" style="background:#FFE8E8; color:#D32F2F;">😳 Non ha dormito</span>`;
+              } else {
+                return `<span class="badge" style="margin-right:0.3rem; margin-bottom:0.3rem;">😴 ${s.status} (${s.from} - ${s.to})</span>`;
+              }
+            }).join(' ');
+          } else {
+            sleepHtml = 'Nessuna registrazione sonno';
+          }
+
+          // HTML Pannolini
           let diapersHtml = '';
           if (item.diapers && item.diapers.length > 0) {
             diapersHtml = item.diapers.map(d => `<span class="badge" style="margin-right:0.3rem; margin-bottom:0.3rem;">🕒 ${d.time} - ${d.status}</span>`).join(' ');
@@ -426,6 +481,7 @@
             diapersHtml = 'Nessun cambio registrato';
           }
 
+          // HTML Attività
           let activitiesHtml = '';
           if (item.activities && item.activities.length > 0) {
             activitiesHtml = item.activities.map(act => `<li>${act}</li>`).join('');
@@ -441,6 +497,11 @@
             <div class="entry-section">
               <strong>😊 Umore al mattino:</strong><br>
               <div style="margin-top:0.3rem; font-size:1.05rem; color:#D96B00;">${moodsText}</div>
+            </div>
+
+            <div class="entry-section" style="margin-top:0.8rem;">
+              <strong>😴 Riposo / Sonno:</strong><br>
+              <div style="margin-top:0.4rem;">${sleepHtml}</div>
             </div>
 
             <div class="entry-section" style="margin-top:0.8rem;">
@@ -572,6 +633,10 @@
         <button type="button" class="btn-option mood-btn" data-val="😴 Coccole">😴 Coccole</button>
         <button type="button" class="btn-option mood-btn" data-val="😠 Nervoso/a">😠 Nervoso/a</button>
       </div>
+
+      <label>😴 Riposo / Sonno:</label>
+      <div id="sleepContainer"></div>
+      <button type="button" class="btn-secondary" onclick="addSleepRow()">+ Aggiungi un altro riposino</button>
 
       <label>🧷 Cambio Pannolino / Bagno:</label>
       <div id="diaperContainer"></div>
