@@ -31,7 +31,6 @@
       font-size: 1.4rem;
       font-weight: bold;
       box-shadow: 0 3px 8px rgba(0,0,0,0.12);
-      letter-spacing: 0.5px;
     }
     .container {
       max-width: 650px;
@@ -98,6 +97,13 @@
     .btn-secondary:hover {
       background: #FFE2D1;
     }
+    .btn-pdf {
+      background: #27AE60;
+      box-shadow: 0 2px 6px rgba(39, 174, 96, 0.3);
+    }
+    .btn-pdf:hover {
+      background: #219150;
+    }
     .btn-remove {
       background: #FF5252;
       color: white;
@@ -117,7 +123,7 @@
       margin-top: 0.4rem;
     }
     .btn-option {
-      padding: 0.61rem 0.4rem;
+      padding: 0.6rem 0.4rem;
       background: #FFF3EB;
       color: #333;
       border: 2px solid transparent;
@@ -155,7 +161,6 @@
       border-radius: 12px;
       margin-bottom: 1.2rem;
       border: 1px solid #FFE8D6;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
     }
     .entry-section {
       margin-bottom: 0.6rem;
@@ -177,14 +182,25 @@
       font-size: 0.85rem;
       font-weight: bold;
     }
+    .install-box {
+      background: #FFF3EB;
+      border: 1px solid #FFC499;
+      padding: 1rem;
+      border-radius: 12px;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+    }
   </style>
+
+  <!-- Libreria per conversione PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <!-- Firebase Web SDK v9 -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
     import { getFirestore, collection, addDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-    // PIN Educatrici / Educatori
+    // Modifica qui il PIN per le educatrici e gli educatori:
     const SECRET_EDUCATOR_PIN = "MGGCUORE2026"; 
 
     const firebaseConfig = {
@@ -199,9 +215,9 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Stato form
     let selectedMoods = [];
     let selectedSnackQty = 'Mangiata tutta';
+    let deferredPrompt;
 
     window.addEventListener('DOMContentLoaded', () => {
       // Gestione Selezione Multipla Umore
@@ -227,9 +243,29 @@
         });
       });
 
-      // Aggiungi primo cambio pannolino di default
+      // Primo cambio pannolino di default
       addDiaperRow();
+
+      // Installazione PWA
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const btn = document.getElementById('installBtn');
+        if (btn) btn.classList.remove('hidden');
+      });
     });
+
+    window.installApp = function() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('App installata');
+          }
+          deferredPrompt = null;
+        });
+      }
+    };
 
     // Gestione Dinamica Cambi Pannolino
     window.addDiaperRow = function() {
@@ -253,7 +289,7 @@
       container.appendChild(div);
     };
 
-    // Gestione Dinamica Attività del Mattino
+    // Gestione Dinamica Attività
     window.addActivityRow = function() {
       const container = document.getElementById('activityContainer');
       const div = document.createElement('div');
@@ -302,18 +338,14 @@
         return;
       }
 
-      // Raccolta cambi pannolino
       const diaperElements = document.querySelectorAll('.diaper-item');
       let diapersList = [];
       diaperElements.forEach(el => {
         const time = el.querySelector('.diaper-time').value;
         const status = el.querySelector('.diaper-status').value;
-        if (time && status) {
-          diapersList.push({ time, status });
-        }
+        if (time && status) diapersList.push({ time, status });
       });
 
-      // Raccolta attività
       const activityElements = document.querySelectorAll('.activity-text');
       let activitiesList = [];
       activityElements.forEach(el => {
@@ -324,7 +356,7 @@
       try {
         await addDoc(collection(db, "diario_entries"), {
           childCode: childCode,
-          moods: selectedMoods.length > 0 ? selectedMoods : ['😊 Sereno / Felice'],
+          moods: selectedMoods.length > 0 ? selectedMoods : ['😊 Sereno'],
           diapers: diapersList,
           snack: {
             qty: selectedSnackQty,
@@ -336,8 +368,6 @@
         });
 
         alert('Scheda giornaliera inviata con successo!');
-        
-        // Reset campi
         document.getElementById('snackWhat').value = '';
         document.getElementById('entryNote').value = '';
         document.getElementById('activityContainer').innerHTML = '';
@@ -374,25 +404,18 @@
           const div = document.createElement('div');
           div.className = 'entry-item';
 
-          // Formattazione Umori
           const moodsText = item.moods ? item.moods.join(' • ') : (item.mood || 'Nessuna indicazione');
 
-          // Formattazione Cambi Pannolino
           let diapersHtml = '';
           if (item.diapers && item.diapers.length > 0) {
             diapersHtml = item.diapers.map(d => `<span class="badge" style="margin-right:0.3rem; margin-bottom:0.3rem;">🕒 ${d.time} - ${d.status}</span>`).join(' ');
-          } else if (item.diaper) {
-            diapersHtml = `<span class="badge">${item.diaper}</span>`;
           } else {
             diapersHtml = 'Nessun cambio registrato';
           }
 
-          // Formattazione Attività
           let activitiesHtml = '';
           if (item.activities && item.activities.length > 0) {
             activitiesHtml = item.activities.map(act => `<li>${act}</li>`).join('');
-          } else if (item.activity) {
-            activitiesHtml = `<li>${item.activity}</li>`;
           }
 
           div.innerHTML = `
@@ -402,7 +425,7 @@
             </div>
 
             <div class="entry-section" style="margin-top:0.8rem;">
-              <strong>🧷 Cambio Pannolino / Bagno (${item.diapers ? item.diapers.length : 1}):</strong><br>
+              <strong>🧷 Cambio Pannolino / Bagno:</strong><br>
               <div style="margin-top:0.4rem;">${diapersHtml}</div>
             </div>
 
@@ -434,6 +457,22 @@
       });
     }
 
+    // Download PDF
+    window.downloadPDF = function() {
+      const element = document.getElementById('entriesList');
+      const childCode = document.getElementById('displayChildCode').innerText;
+      
+      const opt = {
+        margin:       10,
+        filename:     `Diario_Nido_${childCode}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(element).save();
+    };
+
     window.logout = function() {
       location.reload();
     };
@@ -448,7 +487,7 @@
   <div class="container">
     <!-- Scheda Accesso -->
     <div id="auth-card" class="card">
-      <h2>Benvenuti*</h2>
+      <h2>Benvenut*</h2>
       
       <div style="margin-bottom: 1.8rem;">
         <h3>Sei un'Educatrice o un Educatore?</h3>
@@ -464,6 +503,16 @@
         <label for="childCodeInput">Codice Personale Bambina / Bambino:</label>
         <input type="text" id="childCodeInput" placeholder="Es. MARCO123">
         <button onclick="loginParent()">Accedi come Famiglia</button>
+      </div>
+
+      <!-- Istruzioni Installazione -->
+      <div class="install-box">
+        <strong>📱 Come installare l'App sullo Smartphone:</strong>
+        <ul style="margin: 0.5rem 0 0 1.2rem; padding: 0;">
+          <li><strong>Android (Chrome):</strong> Tocca i 3 pallini <code>⋮</code> in alto a destra e seleziona <em>"Installa applicazione"</em> o <em>"Aggiungi a schermata Home"</em>.</li>
+          <li><strong>iPhone (Safari):</strong> Tocca l'icona Condividi 📤 e seleziona <em>"Aggiungi alla schermata Home"</em>.</li>
+        </ul>
+        <button id="installBtn" class="hidden btn-secondary" onclick="installApp()" style="margin-top:0.8rem;">📲 Installa App Ora</button>
       </div>
     </div>
 
@@ -513,7 +562,9 @@
       <div id="entriesList">
         <p style="text-align:center; color:#888;">Caricamento aggiornamenti in corso...</p>
       </div>
-      <button onclick="logout()" style="background: #A0A0A0; margin-top: 1.2rem;">Esci</button>
+
+      <button onclick="downloadPDF()" class="btn-pdf">📄 Scarica Scheda in PDF</button>
+      <button onclick="logout()" style="background: #A0A0A0; margin-top: 0.6rem;">Esci</button>
     </div>
   </div>
 
