@@ -79,7 +79,7 @@
       border: none;
       font-weight: bold;
       cursor: pointer;
-      margin-top: 1.2rem;
+      margin-top: 1rem;
       border-radius: 12px;
       transition: all 0.2s;
       box-shadow: 0 2px 6px rgba(255, 140, 0, 0.3);
@@ -220,6 +220,11 @@
     let deferredPrompt;
 
     window.addEventListener('DOMContentLoaded', () => {
+      // Imposta data odierna di default nel campo data dell'educatrice
+      const today = new Date().toISOString().split('T')[0];
+      const entryDateInput = document.getElementById('entryDate');
+      if (entryDateInput) entryDateInput.value = today;
+
       // Gestione Selezione Multipla Umore
       document.querySelectorAll('.mood-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -329,10 +334,16 @@
 
     // Salvataggio Scheda
     window.saveEntry = async function() {
+      const educatorName = document.getElementById('educatorName').value.trim();
+      const entryDate = document.getElementById('entryDate').value;
       const childCode = document.getElementById('targetChildCode').value.trim().toUpperCase();
       const snackWhat = document.getElementById('snackWhat').value.trim();
       const note = document.getElementById('entryNote').value.trim();
 
+      if (!educatorName) {
+        alert('Inserisci il nome dell\'educatrice o dell\'educatore.');
+        return;
+      }
       if (!childCode) {
         alert('Inserisci il codice identificativo della bambina o del bambino.');
         return;
@@ -356,6 +367,8 @@
       try {
         await addDoc(collection(db, "diario_entries"), {
           childCode: childCode,
+          educatorName: educatorName,
+          date: entryDate,
           moods: selectedMoods.length > 0 ? selectedMoods : ['😊 Sereno'],
           diapers: diapersList,
           snack: {
@@ -392,7 +405,7 @@
         listEl.innerHTML = '';
 
         if (snapshot.empty) {
-          listEl.innerHTML = '<p style="text-align:center; color:#888;">Nessun aggiornamento presente per la giornata odierna.</p>';
+          listEl.innerHTML = '<p style="text-align:center; color:#888;">Nessun aggiornamento presente per questa bambina / bambino.</p>';
           return;
         }
 
@@ -418,7 +431,13 @@
             activitiesHtml = item.activities.map(act => `<li>${act}</li>`).join('');
           }
 
+          const formattedDate = item.date ? new Date(item.date).toLocaleDateString('it-IT') : new Date(item.createdAt).toLocaleDateString('it-IT');
+
           div.innerHTML = `
+            <div style="font-size: 0.9rem; color: #D96B00; font-weight: bold; margin-bottom: 0.6rem; border-bottom: 1px dashed #FFC499; padding-bottom: 0.4rem;">
+              📅 Data: ${formattedDate} ${item.educatorName ? `| 👤 Educatric*/ore: ${item.educatorName}` : ''}
+            </div>
+
             <div class="entry-section">
               <strong>😊 Umore al mattino:</strong><br>
               <div style="margin-top:0.3rem; font-size:1.05rem; color:#D96B00;">${moodsText}</div>
@@ -457,7 +476,7 @@
       });
     }
 
-    // Download PDF
+    // Download PDF per Famiglie
     window.downloadPDF = function() {
       const element = document.getElementById('entriesList');
       const childCode = document.getElementById('displayChildCode').innerText;
@@ -465,6 +484,22 @@
       const opt = {
         margin:       10,
         filename:     `Diario_Nido_${childCode}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(element).save();
+    };
+
+    // Download PDF direttamente dall'Area Educatrice
+    window.downloadEducatorPDF = function() {
+      const element = document.getElementById('educator-view');
+      const childCode = document.getElementById('targetChildCode').value.trim().toUpperCase() || 'Scheda';
+
+      const opt = {
+        margin:       10,
+        filename:     `Scheda_Educatrice_${childCode}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -509,8 +544,8 @@
       <div class="install-box">
         <strong>📱 Come installare l'App sullo Smartphone:</strong>
         <ul style="margin: 0.5rem 0 0 1.2rem; padding: 0;">
-          <li><strong>Android (Chrome):</strong> Tocca i 3 pallini <code>⋮</code> in alto a destra e seleziona <em>"Installa applicazione"</em> o <em>"Aggiungi a schermata Home"</em>.</li>
-          <li><strong>iPhone (Safari):</strong> Tocca l'icona Condividi 📤 e seleziona <em>"Aggiungi alla schermata Home"</em>.</li>
+          <li><strong>Android / Chrome:</strong> Tocca i 3 pallini <code>⋮</code> <u>in alto a destra della schermata del tuo browser</u> e seleziona <em>"Installa applicazione"</em> oppure <em>"Aggiungi a schermata Home"</em>.</li>
+          <li><strong>iPhone / Safari:</strong> Tocca l'icona Condividi 📤 <u>nella barra del browser</u> e seleziona <em>"Aggiungi alla schermata Home"</em>.</li>
         </ul>
         <button id="installBtn" class="hidden btn-secondary" onclick="installApp()" style="margin-top:0.8rem;">📲 Installa App Ora</button>
       </div>
@@ -520,7 +555,13 @@
     <div id="educator-view" class="card hidden">
       <h2>Scheda Giornaliera</h2>
       
-      <label for="targetChildCode">Codice Bambina / Bambino:</label>
+      <label for="educatorName">👤 Educatrice / Educatore che compila:</label>
+      <input type="text" id="educatorName" placeholder="Inserisci il tuo nome">
+
+      <label for="entryDate">📅 Data della giornata:</label>
+      <input type="date" id="entryDate">
+
+      <label for="targetChildCode">👶 Codice Bambina / Bambino:</label>
       <input type="text" id="targetChildCode" placeholder="Es. MARCO123">
 
       <label>😊 Umore al mattino / accoglienza (scelta multipla):</label>
@@ -529,7 +570,7 @@
         <button type="button" class="btn-option mood-btn" data-val="😐 Tranquillo">😐 Tranquillo</button>
         <button type="button" class="btn-option mood-btn" data-val="😢 Agitato">😢 Agitato</button>
         <button type="button" class="btn-option mood-btn" data-val="😴 Coccole">😴 Coccole</button>
-        <button type="button" class="btn-option mood-btn" data-val="😠 Stizzito">😠 Stizzito</button>
+        <button type="button" class="btn-option mood-btn" data-val="😠 Nervoso/a">😠 Nervoso/a</button>
       </div>
 
       <label>🧷 Cambio Pannolino / Bagno:</label>
@@ -553,6 +594,7 @@
       <textarea id="entryNote" rows="3" placeholder="Aggiungi eventuali comunicazioni o dettagli della giornata..."></textarea>
 
       <button onclick="saveEntry()">Invia Scheda alla Famiglia</button>
+      <button onclick="downloadEducatorPDF()" class="btn-pdf">📄 Scarica / Salva PDF Scheda</button>
       <button onclick="logout()" style="background: #A0A0A0; margin-top: 0.6rem;">Esci</button>
     </div>
 
