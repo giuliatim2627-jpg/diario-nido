@@ -1,0 +1,20 @@
+{
+  "name": "Diario del Nido",
+  "short_name": "Diario Nido",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFF8F0",
+  "theme_color": "#FF8C00",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3082/3082060.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3082/3082060.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
