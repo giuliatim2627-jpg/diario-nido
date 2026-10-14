@@ -190,6 +190,13 @@
       margin-top: 1.5rem;
       font-size: 0.9rem;
     }
+    .date-filter-box {
+      background: #FFF3EB;
+      border: 1px solid #FFC499;
+      padding: 0.8rem;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+    }
   </style>
 
   <!-- Libreria per conversione PDF -->
@@ -218,12 +225,24 @@
     let selectedMoods = [];
     let selectedSnackQty = 'Mangiata tutta';
     let deferredPrompt;
+    let currentChildCode = '';
+    let unsubscribeParentListener = null;
 
     window.addEventListener('DOMContentLoaded', () => {
-      // Imposta data odierna
+      // Imposta data odierna di default
       const today = new Date().toISOString().split('T')[0];
       const entryDateInput = document.getElementById('entryDate');
       if (entryDateInput) entryDateInput.value = today;
+
+      const parentDateFilter = document.getElementById('parentDateFilter');
+      if (parentDateFilter) {
+        parentDateFilter.value = today;
+        parentDateFilter.addEventListener('change', () => {
+          if (currentChildCode) {
+            listenForEntries(currentChildCode, parentDateFilter.value);
+          }
+        });
+      }
 
       // Gestione Selezione Multipla Umore
       document.querySelectorAll('.mood-btn').forEach(btn => {
@@ -348,10 +367,13 @@
     window.loginParent = function() {
       const code = document.getElementById('childCodeInput').value.trim().toUpperCase();
       if (code.length >= 3) {
+        currentChildCode = code;
         document.getElementById('auth-card').classList.add('hidden');
         document.getElementById('parent-view').classList.remove('hidden');
         document.getElementById('displayChildCode').innerText = code;
-        listenForEntries(code);
+        
+        const selectedDate = document.getElementById('parentDateFilter').value;
+        listenForEntries(code, selectedDate);
       } else {
         alert('Inserisci un codice valido per la bambina o il bambino.');
       }
@@ -374,7 +396,6 @@
         return;
       }
 
-      // Estrazione Dati Sonno
       const sleepElements = document.querySelectorAll('.sleep-item');
       let sleepsList = [];
       sleepElements.forEach(el => {
@@ -384,7 +405,6 @@
         sleepsList.push({ status, from, to });
       });
 
-      // Estrazione Dati Pannolini
       const diaperElements = document.querySelectorAll('.diaper-item');
       let diapersList = [];
       diaperElements.forEach(el => {
@@ -393,7 +413,6 @@
         if (time && status) diapersList.push({ time, status });
       });
 
-      // Estrazione Dati Attività
       const activityElements = document.querySelectorAll('.activity-text');
       let activitiesList = [];
       activityElements.forEach(el => {
@@ -433,14 +452,18 @@
       }
     };
 
-    // Lettura in tempo reale lato Famiglie
-    function listenForEntries(childCode) {
+    // Lettura in tempo reale lato Famiglie (con filtro Data)
+    function listenForEntries(childCode, selectedDate) {
+      if (unsubscribeParentListener) {
+        unsubscribeParentListener();
+      }
+
       const q = query(
         collection(db, "diario_entries"),
         where("childCode", "==", childCode)
       );
 
-      onSnapshot(q, (snapshot) => {
+      unsubscribeParentListener = onSnapshot(q, (snapshot) => {
         const listEl = document.getElementById('entriesList');
         listEl.innerHTML = '';
 
@@ -450,7 +473,21 @@
         }
 
         let entries = [];
-        snapshot.forEach((doc) => entries.push(doc.data()));
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          // Filtra per data selezionata
+          const docDate = data.date || data.createdAt.split('T')[0];
+          if (!selectedDate || docDate === selectedDate) {
+            entries.push(data);
+          }
+        });
+
+        if (entries.length === 0) {
+          const formattedFilterDate = new Date(selectedDate).toLocaleDateString('it-IT');
+          listEl.innerHTML = `<p style="text-align:center; color:#888;">Nessuna scheda presente per la data del <strong>${formattedFilterDate}</strong>.</p>`;
+          return;
+        }
+
         entries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         entries.forEach(item => {
@@ -459,7 +496,6 @@
 
           const moodsText = item.moods ? item.moods.join(' • ') : (item.mood || 'Nessuna indicazione');
 
-          // HTML Sonno
           let sleepHtml = '';
           if (item.sleeps && item.sleeps.length > 0) {
             sleepHtml = item.sleeps.map(s => {
@@ -473,7 +509,6 @@
             sleepHtml = 'Nessuna registrazione sonno';
           }
 
-          // HTML Pannolini
           let diapersHtml = '';
           if (item.diapers && item.diapers.length > 0) {
             diapersHtml = item.diapers.map(d => `<span class="badge" style="margin-right:0.3rem; margin-bottom:0.3rem;">🕒 ${d.time} - ${d.status}</span>`).join(' ');
@@ -481,7 +516,6 @@
             diapersHtml = 'Nessun cambio registrato';
           }
 
-          // HTML Attività
           let activitiesHtml = '';
           if (item.activities && item.activities.length > 0) {
             activitiesHtml = item.activities.map(act => `<li>${act}</li>`).join('');
@@ -541,10 +575,11 @@
     window.downloadPDF = function() {
       const element = document.getElementById('entriesList');
       const childCode = document.getElementById('displayChildCode').innerText;
+      const selectedDate = document.getElementById('parentDateFilter').value || 'scheda';
       
       const opt = {
         margin:       10,
-        filename:     `Diario_Nido_${childCode}.pdf`,
+        filename:     `Diario_Nido_${childCode}_${selectedDate}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -557,10 +592,11 @@
     window.downloadEducatorPDF = function() {
       const element = document.getElementById('educator-view');
       const childCode = document.getElementById('targetChildCode').value.trim().toUpperCase() || 'Scheda';
+      const date = document.getElementById('entryDate').value || 'data';
 
       const opt = {
         margin:       10,
-        filename:     `Scheda_Educatrice_${childCode}.pdf`,
+        filename:     `Scheda_Educatrice_${childCode}_${date}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -666,6 +702,13 @@
     <!-- Sezione Visualizzazione Famiglie -->
     <div id="parent-view" class="card hidden">
       <h2>Diario di <span id="displayChildCode"></span></h2>
+      
+      <!-- Filtro Data Storico -->
+      <div class="date-filter-box">
+        <label for="parentDateFilter" style="margin-top:0;">📅 Seleziona Data per consultare lo storico:</label>
+        <input type="date" id="parentDateFilter">
+      </div>
+
       <div id="entriesList">
         <p style="text-align:center; color:#888;">Caricamento aggiornamenti in corso...</p>
       </div>
